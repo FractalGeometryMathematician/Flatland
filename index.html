@@ -109,7 +109,7 @@ const shapes = [
 ];
 
 function startNextShape() {
-  currentShapeIndex = (currentShapeIndex + 1) % shapes.length;
+  currentShapeIndex = Math.floor(Math.random() * shapes.length);
 
   polygon = shapes[currentShapeIndex].points;
   lastPolygon = polygon;
