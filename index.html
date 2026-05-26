@@ -25,11 +25,20 @@
     font-size: 18px;
     letter-spacing: 1px;
   }
+
+  #hint {
+    position: fixed;
+    bottom: 25px;
+    left: 25px;
+    color: rgba(255,255,255,0.55);
+    font-size: 16px;
+  }
 </style>
 </head>
 
 <body>
 <div id="label">FLATLAND FOG — cross-section perception</div>
+<div id="hint">Press SPACE to send the next hidden shape</div>
 <canvas id="canvas"></canvas>
 
 <script>
@@ -40,13 +49,15 @@ function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 }
-
 resizeCanvas();
 window.addEventListener("resize", resizeCanvas);
 
 const SENSOR_Y = 0;
-let shapeY = -500;
-const speed = 1.4;
+let shapeY = -900;
+let speed = 2.0;
+let active = false;
+let currentShapeIndex = -1;
+let polygon = [];
 
 function centerX() {
   return canvas.width / 2;
@@ -56,13 +67,76 @@ function centerY() {
   return canvas.height / 2;
 }
 
-// Hidden square
-const polygon = [
-  { x: -120, y: -120 },
-  { x:  120, y: -120 },
-  { x:  120, y:  120 },
-  { x: -120, y:  120 }
+function regularPolygon(sides, radius, rotation = -Math.PI / 2) {
+  let pts = [];
+  for (let i = 0; i < sides; i++) {
+    const angle = rotation + i * Math.PI * 2 / sides;
+    pts.push({
+      x: Math.cos(angle) * radius,
+      y: Math.sin(angle) * radius
+    });
+  }
+  return pts;
+}
+
+const shapes = [
+  {
+    name: "Square",
+    points: [
+      { x: -130, y: -130 },
+      { x:  130, y: -130 },
+      { x:  130, y:  130 },
+      { x: -130, y:  130 }
+    ]
+  },
+  {
+    name: "Triangle",
+    points: [
+      { x: 0, y: -170 },
+      { x: 150, y: 130 },
+      { x: -150, y: 130 }
+    ]
+  },
+  {
+    name: "Pentagon",
+    points: regularPolygon(5, 160)
+  },
+  {
+    name: "Hexagon",
+    points: regularPolygon(6, 155)
+  },
+  {
+    name: "Circle",
+    points: regularPolygon(48, 155)
+  },
+  {
+    name: "Diamond",
+    points: [
+      { x: 0, y: -170 },
+      { x: 150, y: 0 },
+      { x: 0, y: 170 },
+      { x: -150, y: 0 }
+    ]
+  }
 ];
+
+function startNextShape() {
+  if (active) return;
+
+  currentShapeIndex++;
+  if (currentShapeIndex >= shapes.length) currentShapeIndex = 0;
+
+  polygon = shapes[currentShapeIndex].points;
+  shapeY = -500;
+  active = true;
+}
+
+window.addEventListener("keydown", function(e) {
+  if (e.code === "Space") {
+    e.preventDefault();
+    startNextShape();
+  }
+});
 
 function getSliceWidth() {
   const intersections = [];
@@ -88,7 +162,7 @@ function getSliceWidth() {
 
   if (intersections.length >= 2) {
     intersections.sort((a, b) => a - b);
-    return intersections[1] - intersections[0];
+    return intersections[intersections.length - 1] - intersections[0];
   }
 
   return 0;
@@ -126,7 +200,6 @@ function draw() {
 
   drawFog();
 
-  // Sensor line
   ctx.strokeStyle = "rgba(255,255,255,0.18)";
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -134,29 +207,30 @@ function draw() {
   ctx.lineTo(canvas.width, centerY());
   ctx.stroke();
 
-  const width = getSliceWidth();
-
-  // Perceived cross-section
-  if (width > 0) {
-    drawGlowLine(
-      centerX() - width / 2,
-      canvas.height - 130,
-      centerX() + width / 2,
-      canvas.height - 130,
-      10
-    );
-  }
-
-  // Tiny scanner dot
   ctx.fillStyle = "rgba(255,255,255,0.7)";
   ctx.beginPath();
   ctx.arc(centerX(), centerY(), 3, 0, Math.PI * 2);
   ctx.fill();
 
-  shapeY += speed;
+  if (active) {
+    const width = getSliceWidth();
 
-  if (shapeY > canvas.height + 300) {
-    shapeY = -500;
+    if (width > 0) {
+      drawGlowLine(
+        centerX() - width / 2,
+        canvas.height - 130,
+        centerX() + width / 2,
+        canvas.height - 130,
+        10
+      );
+    }
+
+    shapeY += speed;
+
+    if (shapeY > 350) {
+      active = false;
+      shapeY = -900;
+    }
   }
 
   requestAnimationFrame(draw);
