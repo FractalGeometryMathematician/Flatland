@@ -213,30 +213,87 @@ function drawPerceptionLine(width, alpha) {
 }
 
 function draw() {
-  ctx.fillStyle = "black";
+
+  // ======================
+  // MIST BACKGROUND
+  // ======================
+
+  ctx.fillStyle = "rgb(235,235,235)";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  drawFog();
 
-  ctx.strokeStyle = "rgba(255,255,255,0.15)";
+
+  // ======================
+  // SOFT FOG LAYERS
+  // ======================
+
+  for (let i = 0; i < 220; i++) {
+
+    const alpha = Math.random() * 0.03;
+
+    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+
+    const size = Math.random() * 8;
+
+    ctx.beginPath();
+    ctx.arc(
+      Math.random() * canvas.width,
+      Math.random() * canvas.height,
+      size,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+  }
+
+
+
+  // ======================
+  // SENSOR LINE
+  // ======================
+
+  ctx.strokeStyle = "rgba(0,0,0,0.12)";
   ctx.lineWidth = 1;
+
   ctx.beginPath();
   ctx.moveTo(0, centerY());
   ctx.lineTo(canvas.width, centerY());
   ctx.stroke();
 
-  ctx.fillStyle = "rgba(255,255,255,0.7)";
+
+
+  // ======================
+  // SENSOR DOT
+  // ======================
+
+  ctx.fillStyle = "rgba(0,0,0,0.4)";
+
   ctx.beginPath();
   ctx.arc(centerX(), centerY(), 3, 0, Math.PI * 2);
   ctx.fill();
+
+
+
+  // ======================
+  // TARGETS
+  // ======================
 
   let targetWidth = 0;
   let targetAlpha = 0;
 
   if (active) {
+
     targetWidth = getSliceWidth();
 
-    const closeness = Math.min(1, Math.max(0, (shapeY - startY) / (stopY - startY)));
+    const closeness =
+      Math.min(
+        1,
+        Math.max(
+          0,
+          (shapeY - startY) / (stopY - startY)
+        )
+      );
+
     targetAlpha = targetWidth > 0 ? closeness : 0;
 
     shapeY += speed;
@@ -246,10 +303,88 @@ function draw() {
     }
   }
 
+
+
+  // ======================
+  // SMOOTHING
+  // ======================
+
   visibleWidth = lerp(visibleWidth, targetWidth, 0.08);
   visibleAlpha = lerp(visibleAlpha, targetAlpha, 0.05);
 
-  drawPerceptionLine(visibleWidth, visibleAlpha);
+
+
+  // ======================
+  // PERCEPTION LINE
+  // ======================
+
+  if (visibleWidth > 1 && visibleAlpha > 0.01) {
+
+    const y = canvas.height - 130;
+
+    const x1 = centerX() - visibleWidth / 2;
+    const x2 = centerX() + visibleWidth / 2;
+
+    ctx.shadowBlur = 35 * visibleAlpha;
+    ctx.shadowColor = `rgba(0,0,0,${visibleAlpha * 0.45})`;
+
+    ctx.strokeStyle =
+      `rgba(0,0,0,${visibleAlpha * 0.9})`;
+
+    ctx.lineWidth = 10;
+
+    ctx.beginPath();
+    ctx.moveTo(x1, y);
+    ctx.lineTo(x2, y);
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+  }
+
+
+
+  // ======================
+  // OPTIONAL:
+  // ACTUAL SHAPE SHADOW
+  // ======================
+
+  if (active) {
+
+    ctx.save();
+
+    ctx.translate(centerX(), centerY());
+
+    const darkness =
+      Math.min(
+        0.18,
+        visibleAlpha * 0.2
+      );
+
+    ctx.fillStyle =
+      `rgba(0,0,0,${darkness})`;
+
+    ctx.beginPath();
+
+    for (let i = 0; i < polygon.length; i++) {
+
+      const p = polygon[i];
+
+      const x = p.x;
+      const y = p.y + shapeY;
+
+      if (i === 0)
+        ctx.moveTo(x, y);
+      else
+        ctx.lineTo(x, y);
+    }
+
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+
 
   requestAnimationFrame(draw);
 }
