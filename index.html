@@ -112,31 +112,31 @@ document.addEventListener("keydown", e => {
   }
 });
 
-function getVerticalSlice() {
+function getHorizontalSlice() {
   const hits = [];
 
   for (let i = 0; i < polygon.length; i++) {
     const a = polygon[i];
     const b = polygon[(i + 1) % polygon.length];
 
-    const ax = a.x + shapeX;
-    const bx = b.x + shapeX;
+    const ay = a.y + shapeX;
+    const by = b.y + shapeX;
 
-    if ((ax <= sensorX && bx >= sensorX) || (ax >= sensorX && bx <= sensorX)) {
-      if (ax === bx) continue;
+    if ((ay <= sensorX && by >= sensorX) || (ay >= sensorX && by <= sensorX)) {
+      if (ay === by) continue;
 
-      const t = (sensorX - ax) / (bx - ax);
-      const y = a.y + (b.y - a.y) * t;
-      hits.push(y);
+      const t = (sensorX - ay) / (by - ay);
+      const x = a.x + (b.x - a.x) * t;
+      hits.push(x);
     }
   }
 
   if (hits.length >= 2) {
     hits.sort((a, b) => a - b);
     return {
-      top: hits[0],
-      bottom: hits[hits.length - 1],
-      height: hits[hits.length - 1] - hits[0]
+      left: hits[0],
+      right: hits[hits.length - 1],
+      width: hits[hits.length - 1] - hits[0]
     };
   }
 
@@ -165,18 +165,17 @@ function drawMist() {
 function drawSlice(slice) {
   if (!slice) return;
 
-  const y1 = cy() + slice.top;
-  const y2 = cy() + slice.bottom;
+  const x1 = cx() + slice.left;
+  const x2 = cx() + slice.right;
+  const y = cy() + 180;
 
   const progress = Math.min(1, Math.max(0, (shapeX + 420) / 520));
   const alpha = 0.15 + progress * 0.75;
 
-  const x = cx();
-
   ctx.shadowBlur = 35;
   ctx.shadowColor = `rgba(0,0,0,${alpha * 0.35})`;
 
-  const grad = ctx.createLinearGradient(x - 18, y1, x + 18, y2);
+  const grad = ctx.createLinearGradient(x1, y - 18, x2, y + 18);
   grad.addColorStop(0, `rgba(255,255,255,${0.45 * (1 - progress)})`);
   grad.addColorStop(0.35, `rgba(0,0,0,${alpha})`);
   grad.addColorStop(0.65, `rgba(0,0,0,${alpha})`);
@@ -186,19 +185,18 @@ function drawSlice(slice) {
   ctx.lineWidth = 18;
 
   ctx.beginPath();
-  ctx.moveTo(x, y1);
-  ctx.lineTo(x, y2);
+  ctx.moveTo(x1, y);
+  ctx.lineTo(x2, y);
   ctx.stroke();
 
   ctx.shadowBlur = 0;
 
-  // mist veil directly over the slice
   for (let i = 0; i < 18; i++) {
     ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.12 * (1 - progress)})`;
     ctx.beginPath();
     ctx.arc(
-      x + (Math.random() - 0.5) * 60,
-      y1 + Math.random() * (y2 - y1),
+      x1 + Math.random() * (x2 - x1),
+      y + (Math.random() - 0.5) * 60,
       8 + Math.random() * 30,
       0,
       Math.PI * 2
@@ -218,7 +216,7 @@ function draw() {
   ctx.stroke();
 
   if (active) {
-    const slice = getVerticalSlice();
+    const slice = getHorizontalSlice();
     drawSlice(slice);
 
     shapeX += speed;
