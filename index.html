@@ -10,24 +10,19 @@
     background: #eee;
     font-family: Arial, sans-serif;
   }
-
-  canvas {
-    display: block;
-  }
-
+  canvas { display: block; }
   #label {
     position: fixed;
     top: 20px;
-    left: 20px;
+    left: 25px;
     color: rgba(0,0,0,0.65);
     font-size: 18px;
     letter-spacing: 1px;
   }
-
   #hint {
     position: fixed;
     bottom: 25px;
-    left: 25px;
+    left: 30px;
     color: rgba(0,0,0,0.45);
     font-size: 16px;
   }
@@ -47,30 +42,30 @@ function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 }
-
 resizeCanvas();
 window.addEventListener("resize", resizeCanvas);
 
 let active = false;
+let revealing = false;
+
 let currentShapeIndex = -1;
 let polygon = [];
+let lastPolygon = [];
+let lastShapeName = "";
 
 let shapeY = -230;
 let speed = 2.0;
 
+let revealAlpha = 0;
+let revealScale = 0;
+
 const sensorY = 0;
 
-function cx() {
-  return canvas.width / 2;
-}
-
-function cy() {
-  return canvas.height / 2;
-}
+function cx() { return canvas.width / 2; }
+function cy() { return canvas.height / 2; }
 
 function regularPolygon(sides, radius, rotation = -Math.PI / 2) {
   const pts = [];
-
   for (let i = 0; i < sides; i++) {
     const a = rotation + i * Math.PI * 2 / sides;
     pts.push({
@@ -78,7 +73,6 @@ function regularPolygon(sides, radius, rotation = -Math.PI / 2) {
       y: Math.sin(a) * radius
     });
   }
-
   return pts;
 }
 
@@ -100,18 +94,9 @@ const shapes = [
       { x: -165, y: 140 }
     ]
   },
-  {
-    name: "Pentagon",
-    points: regularPolygon(5, 170)
-  },
-  {
-    name: "Hexagon",
-    points: regularPolygon(6, 165)
-  },
-  {
-    name: "Circle",
-    points: regularPolygon(96, 165)
-  },
+  { name: "Pentagon", points: regularPolygon(5, 170) },
+  { name: "Hexagon", points: regularPolygon(6, 165) },
+  { name: "Circle", points: regularPolygon(96, 165) },
   {
     name: "Diamond",
     points: [
@@ -125,10 +110,16 @@ const shapes = [
 
 function startNextShape() {
   currentShapeIndex = (currentShapeIndex + 1) % shapes.length;
+
   polygon = shapes[currentShapeIndex].points;
+  lastPolygon = polygon;
+  lastShapeName = shapes[currentShapeIndex].name;
 
   shapeY = -230;
   active = true;
+  revealing = false;
+  revealAlpha = 0;
+  revealScale = 0;
 }
 
 document.addEventListener("keydown", function(e) {
@@ -160,7 +151,6 @@ function getHorizontalSlice() {
 
   if (hits.length >= 2) {
     hits.sort((a, b) => a - b);
-
     return {
       left: hits[0],
       right: hits[hits.length - 1]
@@ -181,10 +171,9 @@ function drawMist() {
 
   for (let i = 0; i < 60; i++) {
     const size = 30 + Math.random() * 100;
-    const alpha = Math.random() * 0.04;
+    const alpha = Math.random() * 0.025;
 
     ctx.fillStyle = `rgba(255,255,255,${alpha})`;
-
     ctx.beginPath();
     ctx.arc(
       Math.random() * canvas.width,
@@ -231,12 +220,49 @@ function drawSlice(slice) {
   ctx.shadowBlur = 0;
 }
 
+function drawReveal() {
+  if (!revealing && revealAlpha <= 0) return;
+
+  revealAlpha += (1 - revealAlpha) * 0.04;
+  revealScale += (1 - revealScale) * 0.05;
+
+  const x = canvas.width - 180;
+  const y = canvas.height - 170;
+  const scale = 0.42 * revealScale;
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  ctx.fillStyle = `rgba(0,0,0,${0.72 * revealAlpha})`;
+  ctx.strokeStyle = `rgba(0,0,0,${0.35 * revealAlpha})`;
+  ctx.lineWidth = 3;
+
+  ctx.beginPath();
+
+  for (let i = 0; i < lastPolygon.length; i++) {
+    const p = lastPolygon[i];
+
+    if (i === 0) ctx.moveTo(p.x * scale, p.y * scale);
+    else ctx.lineTo(p.x * scale, p.y * scale);
+  }
+
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.restore();
+
+  ctx.fillStyle = `rgba(0,0,0,${0.65 * revealAlpha})`;
+  ctx.font = "18px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText(lastShapeName, x, y + 115);
+}
+
 function draw() {
   drawMist();
 
   ctx.strokeStyle = "rgba(0,0,0,0.14)";
   ctx.lineWidth = 1;
-
   ctx.beginPath();
   ctx.moveTo(0, cy());
   ctx.lineTo(canvas.width, cy());
@@ -250,8 +276,11 @@ function draw() {
 
     if (shapeY > 230) {
       active = false;
+      revealing = true;
     }
   }
+
+  drawReveal();
 
   requestAnimationFrame(draw);
 }
