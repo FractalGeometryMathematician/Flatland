@@ -7,14 +7,10 @@
   html, body {
     margin: 0;
     overflow: hidden;
-    background: white;
+    background: #eee;
     font-family: Arial, sans-serif;
   }
-
-  canvas {
-    display: block;
-  }
-
+  canvas { display: block; }
   #label {
     position: fixed;
     top: 20px;
@@ -23,7 +19,6 @@
     font-size: 18px;
     letter-spacing: 1px;
   }
-
   #hint {
     position: fixed;
     bottom: 25px;
@@ -35,8 +30,8 @@
 </head>
 
 <body>
-<div id="label">FLATLAND FOG — shape emerging through mist</div>
-<div id="hint">Press SPACE for next shape</div>
+<div id="label">FLATLAND FOG — side-view cross-section</div>
+<div id="hint">Press SPACE for next hidden shape</div>
 <canvas id="canvas"></canvas>
 
 <script>
@@ -54,30 +49,20 @@ let active = false;
 let currentShapeIndex = -1;
 let polygon = [];
 
-let distance = 0;
-let targetDistance = 0;
+let shapeX = -420;
+let speed = 2.2;
 
-const speed = 0.012;
+const sensorX = 0;
 
-function centerX() {
-  return canvas.width / 2;
-}
-
-function centerY() {
-  return canvas.height / 2;
-}
+function cx() { return canvas.width / 2; }
+function cy() { return canvas.height / 2; }
 
 function regularPolygon(sides, radius, rotation = -Math.PI / 2) {
   const pts = [];
-
   for (let i = 0; i < sides; i++) {
-    const angle = rotation + i * Math.PI * 2 / sides;
-    pts.push({
-      x: Math.cos(angle) * radius,
-      y: Math.sin(angle) * radius
-    });
+    const a = rotation + i * Math.PI * 2 / sides;
+    pts.push({ x: Math.cos(a) * radius, y: Math.sin(a) * radius });
   }
-
   return pts;
 }
 
@@ -85,39 +70,30 @@ const shapes = [
   {
     name: "Square",
     points: [
-      { x: -140, y: -140 },
-      { x:  140, y: -140 },
-      { x:  140, y:  140 },
-      { x: -140, y:  140 }
+      { x: -150, y: -150 },
+      { x:  150, y: -150 },
+      { x:  150, y:  150 },
+      { x: -150, y:  150 }
     ]
   },
   {
     name: "Triangle",
     points: [
-      { x: 0, y: -180 },
-      { x: 160, y: 140 },
-      { x: -160, y: 140 }
+      { x: -160, y: 150 },
+      { x: 160, y: 0 },
+      { x: -160, y: -150 }
     ]
   },
-  {
-    name: "Pentagon",
-    points: regularPolygon(5, 170)
-  },
-  {
-    name: "Hexagon",
-    points: regularPolygon(6, 165)
-  },
-  {
-    name: "Circle",
-    points: regularPolygon(80, 165)
-  },
+  { name: "Pentagon", points: regularPolygon(5, 170) },
+  { name: "Hexagon", points: regularPolygon(6, 165) },
+  { name: "Circle", points: regularPolygon(96, 165) },
   {
     name: "Diamond",
     points: [
-      { x: 0, y: -185 },
-      { x: 165, y: 0 },
-      { x: 0, y: 185 },
-      { x: -165, y: 0 }
+      { x: 0, y: -180 },
+      { x: 180, y: 0 },
+      { x: 0, y: 180 },
+      { x: -180, y: 0 }
     ]
   }
 ];
@@ -125,45 +101,105 @@ const shapes = [
 function startNextShape() {
   currentShapeIndex = (currentShapeIndex + 1) % shapes.length;
   polygon = shapes[currentShapeIndex].points;
-
-  distance = 0;
-  targetDistance = 1;
+  shapeX = -420;
   active = true;
 }
 
-document.addEventListener("keydown", function(e) {
+document.addEventListener("keydown", e => {
   if (e.code === "Space") {
     e.preventDefault();
     startNextShape();
   }
 });
 
-function lerp(a, b, t) {
-  return a + (b - a) * t;
+function getVerticalSlice() {
+  const hits = [];
+
+  for (let i = 0; i < polygon.length; i++) {
+    const a = polygon[i];
+    const b = polygon[(i + 1) % polygon.length];
+
+    const ax = a.x + shapeX;
+    const bx = b.x + shapeX;
+
+    if ((ax <= sensorX && bx >= sensorX) || (ax >= sensorX && bx <= sensorX)) {
+      if (ax === bx) continue;
+
+      const t = (sensorX - ax) / (bx - ax);
+      const y = a.y + (b.y - a.y) * t;
+      hits.push(y);
+    }
+  }
+
+  if (hits.length >= 2) {
+    hits.sort((a, b) => a - b);
+    return {
+      top: hits[0],
+      bottom: hits[hits.length - 1],
+      height: hits[hits.length - 1] - hits[0]
+    };
+  }
+
+  return null;
 }
 
-function drawMistBackground() {
-  const grad = ctx.createRadialGradient(
-    centerX(), centerY(), 50,
-    centerX(), centerY(), canvas.width * 0.7
-  );
+function drawMist() {
+  const g = ctx.createLinearGradient(0, 0, canvas.width, 0);
+  g.addColorStop(0, "#f8f8f4");
+  g.addColorStop(0.5, "#e7e7e2");
+  g.addColorStop(1, "#f8f8f4");
 
-  grad.addColorStop(0, "rgb(245,245,242)");
-  grad.addColorStop(1, "rgb(210,213,210)");
-
-  ctx.fillStyle = grad;
+  ctx.fillStyle = g;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  for (let i = 0; i < 260; i++) {
-    const size = 20 + Math.random() * 90;
-    const alpha = Math.random() * 0.055;
-
+  for (let i = 0; i < 250; i++) {
+    const size = 30 + Math.random() * 100;
+    const alpha = Math.random() * 0.045;
     ctx.fillStyle = `rgba(255,255,255,${alpha})`;
     ctx.beginPath();
+    ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawSlice(slice) {
+  if (!slice) return;
+
+  const y1 = cy() + slice.top;
+  const y2 = cy() + slice.bottom;
+
+  const progress = Math.min(1, Math.max(0, (shapeX + 420) / 520));
+  const alpha = 0.15 + progress * 0.75;
+
+  const x = cx();
+
+  ctx.shadowBlur = 35;
+  ctx.shadowColor = `rgba(0,0,0,${alpha * 0.35})`;
+
+  const grad = ctx.createLinearGradient(x - 18, y1, x + 18, y2);
+  grad.addColorStop(0, `rgba(255,255,255,${0.45 * (1 - progress)})`);
+  grad.addColorStop(0.35, `rgba(0,0,0,${alpha})`);
+  grad.addColorStop(0.65, `rgba(0,0,0,${alpha})`);
+  grad.addColorStop(1, `rgba(255,255,255,${0.35 * (1 - progress)})`);
+
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = 18;
+
+  ctx.beginPath();
+  ctx.moveTo(x, y1);
+  ctx.lineTo(x, y2);
+  ctx.stroke();
+
+  ctx.shadowBlur = 0;
+
+  // mist veil directly over the slice
+  for (let i = 0; i < 18; i++) {
+    ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.12 * (1 - progress)})`;
+    ctx.beginPath();
     ctx.arc(
-      Math.random() * canvas.width,
-      Math.random() * canvas.height,
-      size,
+      x + (Math.random() - 0.5) * 60,
+      y1 + Math.random() * (y2 - y1),
+      8 + Math.random() * 30,
       0,
       Math.PI * 2
     );
@@ -171,89 +207,23 @@ function drawMistBackground() {
   }
 }
 
-function makeShapePath(scale) {
-  ctx.beginPath();
-
-  for (let i = 0; i < polygon.length; i++) {
-    const p = polygon[i];
-
-    const x = centerX() + p.x * scale;
-    const y = centerY() + p.y * scale;
-
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-
-  ctx.closePath();
-}
-
-function drawEmergingShape() {
-  if (!active && distance < 0.01) return;
-
-  const scale = lerp(0.15, 1.25, distance);
-  const darkness = lerp(0.03, 0.92, distance);
-
-  ctx.save();
-
-  makeShapePath(scale);
-
-  ctx.shadowBlur = 60 * (1 - distance);
-  ctx.shadowColor = "rgba(255,255,255,0.9)";
-
-  ctx.fillStyle = `rgba(0,0,0,${darkness})`;
-  ctx.fill();
-
-  ctx.clip();
-
-  // Fog inside the shape: far side remains cloudy, near side clears.
-  const fogGradient = ctx.createLinearGradient(
-    centerX() - 220 * scale,
-    centerY() - 220 * scale,
-    centerX() + 220 * scale,
-    centerY() + 220 * scale
-  );
-
-  fogGradient.addColorStop(0.00, `rgba(255,255,255,${0.85 * (1 - distance)})`);
-  fogGradient.addColorStop(0.45, `rgba(255,255,255,${0.45 * (1 - distance)})`);
-  fogGradient.addColorStop(1.00, `rgba(255,255,255,${0.08 * (1 - distance)})`);
-
-  ctx.fillStyle = fogGradient;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Cloud patches over different parts of the shape.
-  for (let i = 0; i < 45; i++) {
-    const px = centerX() + (Math.random() - 0.5) * 380 * scale;
-    const py = centerY() + (Math.random() - 0.5) * 380 * scale;
-    const size = 15 + Math.random() * 55;
-    const alpha = Math.random() * 0.13 * (1 - distance);
-
-    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
-    ctx.beginPath();
-    ctx.arc(px, py, size, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  ctx.restore();
-
-  // Darker edge as it gets closer.
-  ctx.save();
-  makeShapePath(scale);
-  ctx.strokeStyle = `rgba(0,0,0,${0.45 * distance})`;
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  ctx.restore();
-}
-
 function draw() {
-  drawMistBackground();
+  drawMist();
 
-  distance = lerp(distance, targetDistance, speed);
+  ctx.strokeStyle = "rgba(0,0,0,0.12)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx(), 0);
+  ctx.lineTo(cx(), canvas.height);
+  ctx.stroke();
 
-  drawEmergingShape();
+  if (active) {
+    const slice = getVerticalSlice();
+    drawSlice(slice);
 
-  if (distance > 0.985) {
-    targetDistance = 0;
-    active = false;
+    shapeX += speed;
+
+    if (shapeX > 260) active = false;
   }
 
   requestAnimationFrame(draw);
