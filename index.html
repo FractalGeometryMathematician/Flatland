@@ -10,7 +10,11 @@
     background: #eee;
     font-family: Arial, sans-serif;
   }
-  canvas { display: block; }
+
+  canvas {
+    display: block;
+  }
+
   #label {
     position: fixed;
     top: 20px;
@@ -19,6 +23,7 @@
     font-size: 18px;
     letter-spacing: 1px;
   }
+
   #hint {
     position: fixed;
     bottom: 25px;
@@ -30,7 +35,7 @@
 </head>
 
 <body>
-<div id="label">FLATLAND FOG — side-view cross-section</div>
+<div id="label">FLATLAND FOG — side-view horizontal cross-section</div>
 <div id="hint">Press SPACE for next hidden shape</div>
 <canvas id="canvas"></canvas>
 
@@ -42,32 +47,45 @@ function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 }
+
 resizeCanvas();
 window.addEventListener("resize", resizeCanvas);
 
-let revealTimer = 0;
-let revealing = false;
-let lastShapeName = "";
-let lastPolygon = [];
-
 let active = false;
-let currentShapeIndex = -1;
-let polygon = [];
+let revealing = false;
 
-let shapeX = -420;
+let revealTimer = 0;
+let currentShapeIndex = -1;
+
+let polygon = [];
+let lastPolygon = [];
+let lastShapeName = "";
+
+let shapeY = -430;
 let speed = 2.2;
 
-const sensorX = 0;
+const sensorY = 0;
 
-function cx() { return canvas.width / 2; }
-function cy() { return canvas.height / 2; }
+function cx() {
+  return canvas.width / 2;
+}
+
+function cy() {
+  return canvas.height / 2;
+}
 
 function regularPolygon(sides, radius, rotation = -Math.PI / 2) {
   const pts = [];
+
   for (let i = 0; i < sides; i++) {
     const a = rotation + i * Math.PI * 2 / sides;
-    pts.push({ x: Math.cos(a) * radius, y: Math.sin(a) * radius });
+
+    pts.push({
+      x: Math.cos(a) * radius,
+      y: Math.sin(a) * radius
+    });
   }
+
   return pts;
 }
 
@@ -84,21 +102,30 @@ const shapes = [
   {
     name: "Triangle",
     points: [
-      { x: -160, y: 150 },
-      { x: 160, y: 0 },
-      { x: -160, y: -150 }
+      { x: 0, y: -180 },
+      { x: 165, y: 140 },
+      { x: -165, y: 140 }
     ]
   },
-  { name: "Pentagon", points: regularPolygon(5, 170) },
-  { name: "Hexagon", points: regularPolygon(6, 165) },
-  { name: "Circle", points: regularPolygon(96, 165) },
+  {
+    name: "Pentagon",
+    points: regularPolygon(5, 170)
+  },
+  {
+    name: "Hexagon",
+    points: regularPolygon(6, 165)
+  },
+  {
+    name: "Circle",
+    points: regularPolygon(96, 165)
+  },
   {
     name: "Diamond",
     points: [
-      { x: 0, y: -180 },
-      { x: 180, y: 0 },
-      { x: 0, y: 180 },
-      { x: -180, y: 0 }
+      { x: 0, y: -185 },
+      { x: 185, y: 0 },
+      { x: 0, y: 185 },
+      { x: -185, y: 0 }
     ]
   }
 ];
@@ -106,15 +133,18 @@ const shapes = [
 function startNextShape() {
   revealing = false;
   revealTimer = 0;
-  lastShapeName = shapes[currentShapeIndex].name;
-  lastPolygon = polygon;
+
   currentShapeIndex = (currentShapeIndex + 1) % shapes.length;
+
   polygon = shapes[currentShapeIndex].points;
-  shapeX = -420;
+  lastPolygon = polygon;
+  lastShapeName = shapes[currentShapeIndex].name;
+
+  shapeY = -430;
   active = true;
 }
 
-document.addEventListener("keydown", e => {
+document.addEventListener("keydown", function(e) {
   if (e.code === "Space") {
     e.preventDefault();
     startNextShape();
@@ -128,20 +158,22 @@ function getHorizontalSlice() {
     const a = polygon[i];
     const b = polygon[(i + 1) % polygon.length];
 
-    const ay = a.y + shapeX;
-    const by = b.y + shapeX;
+    const ay = a.y + shapeY;
+    const by = b.y + shapeY;
 
-    if ((ay <= sensorX && by >= sensorX) || (ay >= sensorX && by <= sensorX)) {
+    if ((ay <= sensorY && by >= sensorY) || (ay >= sensorY && by <= sensorY)) {
       if (ay === by) continue;
 
-      const t = (sensorX - ay) / (by - ay);
+      const t = (sensorY - ay) / (by - ay);
       const x = a.x + (b.x - a.x) * t;
+
       hits.push(x);
     }
   }
 
   if (hits.length >= 2) {
     hits.sort((a, b) => a - b);
+
     return {
       left: hits[0],
       right: hits[hits.length - 1],
@@ -154,6 +186,7 @@ function getHorizontalSlice() {
 
 function drawMist() {
   const g = ctx.createLinearGradient(0, 0, canvas.width, 0);
+
   g.addColorStop(0, "#f8f8f4");
   g.addColorStop(0.5, "#e7e7e2");
   g.addColorStop(1, "#f8f8f4");
@@ -161,12 +194,20 @@ function drawMist() {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  for (let i = 0; i < 250; i++) {
+  for (let i = 0; i < 260; i++) {
     const size = 30 + Math.random() * 100;
     const alpha = Math.random() * 0.045;
+
     ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+
     ctx.beginPath();
-    ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, size, 0, Math.PI * 2);
+    ctx.arc(
+      Math.random() * canvas.width,
+      Math.random() * canvas.height,
+      size,
+      0,
+      Math.PI * 2
+    );
     ctx.fill();
   }
 }
@@ -178,13 +219,14 @@ function drawSlice(slice) {
   const x2 = cx() + slice.right;
   const y = cy() + 180;
 
-  const progress = Math.min(1, Math.max(0, (shapeX + 420) / 520));
+  const progress = Math.min(1, Math.max(0, (shapeY + 430) / 520));
   const alpha = 0.15 + progress * 0.75;
 
   ctx.shadowBlur = 35;
   ctx.shadowColor = `rgba(0,0,0,${alpha * 0.35})`;
 
   const grad = ctx.createLinearGradient(x1, y - 18, x2, y + 18);
+
   grad.addColorStop(0, `rgba(255,255,255,${0.45 * (1 - progress)})`);
   grad.addColorStop(0.35, `rgba(0,0,0,${alpha})`);
   grad.addColorStop(0.65, `rgba(0,0,0,${alpha})`);
@@ -202,9 +244,10 @@ function drawSlice(slice) {
 
   for (let i = 0; i < 18; i++) {
     ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.12 * (1 - progress)})`;
+
     ctx.beginPath();
     ctx.arc(
-      x1 + Math.random() * (x2 - x1),
+      x1 + Math.random() * Math.max(1, x2 - x1),
       y + (Math.random() - 0.5) * 60,
       8 + Math.random() * 30,
       0,
@@ -217,20 +260,24 @@ function drawSlice(slice) {
 function drawReveal() {
   if (!revealing) return;
 
-  const scale = 0.55;
+  const scale = 0.45;
   const x = canvas.width - 170;
   const y = canvas.height - 170;
 
   ctx.save();
   ctx.translate(x, y);
 
-  ctx.fillStyle = "rgba(0,0,0,0.75)";
+  ctx.fillStyle = "rgba(0,0,0,0.72)";
   ctx.beginPath();
 
   for (let i = 0; i < lastPolygon.length; i++) {
     const p = lastPolygon[i];
-    if (i === 0) ctx.moveTo(p.x * scale, p.y * scale);
-    else ctx.lineTo(p.x * scale, p.y * scale);
+
+    if (i === 0) {
+      ctx.moveTo(p.x * scale, p.y * scale);
+    } else {
+      ctx.lineTo(p.x * scale, p.y * scale);
+    }
   }
 
   ctx.closePath();
@@ -241,7 +288,7 @@ function drawReveal() {
   ctx.fillStyle = "rgba(0,0,0,0.65)";
   ctx.font = "18px Arial";
   ctx.textAlign = "center";
-  ctx.fillText(lastShapeName, x, y + 120);
+  ctx.fillText(lastShapeName, x, y + 115);
 
   revealTimer--;
 
@@ -253,26 +300,31 @@ function drawReveal() {
 function draw() {
   drawMist();
 
+  const sliceY = cy() + 180;
+
   ctx.strokeStyle = "rgba(0,0,0,0.12)";
   ctx.lineWidth = 1;
+
   ctx.beginPath();
-  ctx.moveTo(cx(), 0);
-  ctx.lineTo(cx(), canvas.height);
+  ctx.moveTo(0, sliceY);
+  ctx.lineTo(canvas.width, sliceY);
   ctx.stroke();
 
   if (active) {
     const slice = getHorizontalSlice();
     drawSlice(slice);
 
-    shapeX += speed;
+    shapeY += speed;
 
-    if (shapeX > 260) {
+    if (shapeY > 260) {
       active = false;
       revealing = true;
-      revealTimer = 120;
+      revealTimer = 140;
     }
   }
+
   drawReveal();
+
   requestAnimationFrame(draw);
 }
 
