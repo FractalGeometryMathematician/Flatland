@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Flatland Fog</title>
+
+<style>
+  html, body {
+    margin: 0;
+    overflow: hidden;
+    background: black;
+    font-family: Arial, sans-serif;
+  }
+
+  canvas {
+    display: block;
+  }
+
+  #label {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    color: rgba(255,255,255,0.8);
+    font-size: 18px;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+
+<body>
+<div id="label">FLATLAND FOG — cross-section perception</div>
+<canvas id="canvas"></canvas>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
+const SENSOR_Y = 0;
+let shapeY = -500;
+const speed = 1.4;
+
+function centerX() {
+  return canvas.width / 2;
+}
+
+function centerY() {
+  return canvas.height / 2;
+}
+
+// Hidden square
+const polygon = [
+  { x: -120, y: -120 },
+  { x:  120, y: -120 },
+  { x:  120, y:  120 },
+  { x: -120, y:  120 }
+];
+
+function getSliceWidth() {
+  const intersections = [];
+
+  for (let i = 0; i < polygon.length; i++) {
+    const a = polygon[i];
+    const b = polygon[(i + 1) % polygon.length];
+
+    const ay = a.y + shapeY;
+    const by = b.y + shapeY;
+
+    if ((ay <= SENSOR_Y && by >= SENSOR_Y) ||
+        (ay >= SENSOR_Y && by <= SENSOR_Y)) {
+
+      if (ay === by) continue;
+
+      const t = (SENSOR_Y - ay) / (by - ay);
+      const x = a.x + (b.x - a.x) * t;
+
+      intersections.push(x);
+    }
+  }
+
+  if (intersections.length >= 2) {
+    intersections.sort((a, b) => a - b);
+    return intersections[1] - intersections[0];
+  }
+
+  return 0;
+}
+
+function drawFog() {
+  for (let i = 0; i < 140; i++) {
+    ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.035})`;
+    ctx.fillRect(
+      Math.random() * canvas.width,
+      Math.random() * canvas.height,
+      2,
+      2
+    );
+  }
+}
+
+function drawGlowLine(x1, y1, x2, y2, width) {
+  ctx.shadowBlur = 25;
+  ctx.shadowColor = "white";
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = width;
+
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+
+  ctx.shadowBlur = 0;
+}
+
+function draw() {
+  ctx.fillStyle = "black";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  drawFog();
+
+  // Sensor line
+  ctx.strokeStyle = "rgba(255,255,255,0.18)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, centerY());
+  ctx.lineTo(canvas.width, centerY());
+  ctx.stroke();
+
+  const width = getSliceWidth();
+
+  // Perceived cross-section
+  if (width > 0) {
+    drawGlowLine(
+      centerX() - width / 2,
+      canvas.height - 130,
+      centerX() + width / 2,
+      canvas.height - 130,
+      10
+    );
+  }
+
+  // Tiny scanner dot
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.beginPath();
+  ctx.arc(centerX(), centerY(), 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  shapeY += speed;
+
+  if (shapeY > canvas.height + 300) {
+    shapeY = -500;
+  }
+
+  requestAnimationFrame(draw);
+}
+
+draw();
+</script>
+</body>
+</html>
