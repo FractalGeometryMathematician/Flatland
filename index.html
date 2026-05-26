@@ -45,6 +45,11 @@ function resizeCanvas() {
 resizeCanvas();
 window.addEventListener("resize", resizeCanvas);
 
+let revealTimer = 0;
+let revealing = false;
+let lastShapeName = "";
+let lastPolygon = [];
+
 let active = false;
 let currentShapeIndex = -1;
 let polygon = [];
@@ -99,6 +104,10 @@ const shapes = [
 ];
 
 function startNextShape() {
+  revealing = false;
+  revealTimer = 0;
+  lastShapeName = shapes[currentShapeIndex].name;
+  lastPolygon = polygon;
   currentShapeIndex = (currentShapeIndex + 1) % shapes.length;
   polygon = shapes[currentShapeIndex].points;
   shapeX = -420;
@@ -205,6 +214,42 @@ function drawSlice(slice) {
   }
 }
 
+function drawReveal() {
+  if (!revealing) return;
+
+  const scale = 0.55;
+  const x = canvas.width - 170;
+  const y = canvas.height - 170;
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  ctx.fillStyle = "rgba(0,0,0,0.75)";
+  ctx.beginPath();
+
+  for (let i = 0; i < lastPolygon.length; i++) {
+    const p = lastPolygon[i];
+    if (i === 0) ctx.moveTo(p.x * scale, p.y * scale);
+    else ctx.lineTo(p.x * scale, p.y * scale);
+  }
+
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+
+  ctx.fillStyle = "rgba(0,0,0,0.65)";
+  ctx.font = "18px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText(lastShapeName, x, y + 120);
+
+  revealTimer--;
+
+  if (revealTimer <= 0) {
+    revealing = false;
+  }
+}
+
 function draw() {
   drawMist();
 
@@ -221,9 +266,13 @@ function draw() {
 
     shapeX += speed;
 
-    if (shapeX > 260) active = false;
+    if (shapeX > 260) {
+      active = false;
+      revealing = true;
+      revealTimer = 120;
+    }
   }
-
+  drawReveal();
   requestAnimationFrame(draw);
 }
 
