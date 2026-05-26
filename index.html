@@ -38,7 +38,7 @@
 
 <body>
 <div id="label">FLATLAND FOG — cross-section perception</div>
-<div id="hint">Press SPACE to send the next hidden shape</div>
+<div id="hint">Press SPACE for the next hidden shape</div>
 <canvas id="canvas"></canvas>
 
 <script>
@@ -52,12 +52,17 @@ function resizeCanvas() {
 resizeCanvas();
 window.addEventListener("resize", resizeCanvas);
 
-const SENSOR_Y = 0;
-let shapeY = -900;
-let speed = 2.0;
 let active = false;
+let shapeY = -520;
 let currentShapeIndex = -1;
 let polygon = [];
+
+let visibleWidth = 0;
+let visibleAlpha = 0;
+
+const speed = 2.3;
+const startY = -520;
+const stopY = 260;
 
 function centerX() {
   return canvas.width / 2;
@@ -68,14 +73,17 @@ function centerY() {
 }
 
 function regularPolygon(sides, radius, rotation = -Math.PI / 2) {
-  let pts = [];
+  const pts = [];
+
   for (let i = 0; i < sides; i++) {
     const angle = rotation + i * Math.PI * 2 / sides;
+
     pts.push({
       x: Math.cos(angle) * radius,
       y: Math.sin(angle) * radius
     });
   }
+
   return pts;
 }
 
@@ -107,7 +115,7 @@ const shapes = [
   },
   {
     name: "Circle",
-    points: regularPolygon(48, 155)
+    points: regularPolygon(80, 155)
   },
   {
     name: "Diamond",
@@ -121,17 +129,18 @@ const shapes = [
 ];
 
 function startNextShape() {
-  if (active) return;
-
-  currentShapeIndex++;
-  if (currentShapeIndex >= shapes.length) currentShapeIndex = 0;
+  currentShapeIndex = (currentShapeIndex + 1) % shapes.length;
 
   polygon = shapes[currentShapeIndex].points;
-  shapeY = -500;
+  shapeY = startY;
+
+  visibleWidth = 0;
+  visibleAlpha = 0;
+
   active = true;
 }
 
-window.addEventListener("keydown", function(e) {
+document.addEventListener("keydown", function(e) {
   if (e.code === "Space") {
     e.preventDefault();
     startNextShape();
@@ -148,12 +157,10 @@ function getSliceWidth() {
     const ay = a.y + shapeY;
     const by = b.y + shapeY;
 
-    if ((ay <= SENSOR_Y && by >= SENSOR_Y) ||
-        (ay >= SENSOR_Y && by <= SENSOR_Y)) {
-
+    if ((ay <= 0 && by >= 0) || (ay >= 0 && by <= 0)) {
       if (ay === by) continue;
 
-      const t = (SENSOR_Y - ay) / (by - ay);
+      const t = (0 - ay) / (by - ay);
       const x = a.x + (b.x - a.x) * t;
 
       intersections.push(x);
@@ -170,7 +177,7 @@ function getSliceWidth() {
 
 function drawFog() {
   for (let i = 0; i < 140; i++) {
-    ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.035})`;
+    ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.025})`;
     ctx.fillRect(
       Math.random() * canvas.width,
       Math.random() * canvas.height,
@@ -180,15 +187,26 @@ function drawFog() {
   }
 }
 
-function drawGlowLine(x1, y1, x2, y2, width) {
-  ctx.shadowBlur = 25;
-  ctx.shadowColor = "white";
-  ctx.strokeStyle = "white";
-  ctx.lineWidth = width;
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function drawPerceptionLine(width, alpha) {
+  if (width <= 1 || alpha <= 0.01) return;
+
+  const y = canvas.height - 130;
+  const x1 = centerX() - width / 2;
+  const x2 = centerX() + width / 2;
+
+  ctx.shadowBlur = 30 * alpha;
+  ctx.shadowColor = `rgba(255,255,255,${alpha})`;
+
+  ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+  ctx.lineWidth = 10;
 
   ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
+  ctx.moveTo(x1, y);
+  ctx.lineTo(x2, y);
   ctx.stroke();
 
   ctx.shadowBlur = 0;
@@ -200,7 +218,7 @@ function draw() {
 
   drawFog();
 
-  ctx.strokeStyle = "rgba(255,255,255,0.18)";
+  ctx.strokeStyle = "rgba(255,255,255,0.15)";
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(0, centerY());
@@ -212,26 +230,26 @@ function draw() {
   ctx.arc(centerX(), centerY(), 3, 0, Math.PI * 2);
   ctx.fill();
 
-  if (active) {
-    const width = getSliceWidth();
+  let targetWidth = 0;
+  let targetAlpha = 0;
 
-    if (width > 0) {
-      drawGlowLine(
-        centerX() - width / 2,
-        canvas.height - 130,
-        centerX() + width / 2,
-        canvas.height - 130,
-        10
-      );
-    }
+  if (active) {
+    targetWidth = getSliceWidth();
+
+    const closeness = Math.min(1, Math.max(0, (shapeY - startY) / (stopY - startY)));
+    targetAlpha = targetWidth > 0 ? closeness : 0;
 
     shapeY += speed;
 
-    if (shapeY > 350) {
+    if (shapeY > stopY) {
       active = false;
-      shapeY = -900;
     }
   }
+
+  visibleWidth = lerp(visibleWidth, targetWidth, 0.08);
+  visibleAlpha = lerp(visibleAlpha, targetAlpha, 0.05);
+
+  drawPerceptionLine(visibleWidth, visibleAlpha);
 
   requestAnimationFrame(draw);
 }
