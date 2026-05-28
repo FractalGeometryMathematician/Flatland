@@ -45,21 +45,23 @@ function resizeCanvas() {
 resizeCanvas();
 window.addEventListener("resize", resizeCanvas);
 
-let active = false;
-let revealing = false;
-
+let state = "idle"; 
 let currentShapeIndex = -1;
 let polygon = [];
 let lastPolygon = [];
 let lastShapeName = "";
 
 let shapeY = -230;
-let speed = 0.5;
+let approachProgress = 0;
+let holdTimer = 0;
+let fadeAlpha = 1;
 
 let revealAlpha = 0;
 let revealScale = 0;
 
 const sensorY = 0;
+const speed = 0.006;
+const HOLD_FRAMES = 120;
 
 function cx() { return canvas.width / 2; }
 function cy() { return canvas.height / 2; }
@@ -68,10 +70,7 @@ function regularPolygon(sides, radius, rotation = -Math.PI / 2) {
   const pts = [];
   for (let i = 0; i < sides; i++) {
     const a = rotation + i * Math.PI * 2 / sides;
-    pts.push({
-      x: Math.cos(a) * radius,
-      y: Math.sin(a) * radius
-    });
+    pts.push({ x: Math.cos(a) * radius, y: Math.sin(a) * radius });
   }
   return pts;
 }
@@ -116,10 +115,14 @@ function startNextShape() {
   lastShapeName = shapes[currentShapeIndex].name;
 
   shapeY = -230;
-  active = true;
-  revealing = false;
+  approachProgress = 0;
+  holdTimer = 0;
+  fadeAlpha = 1;
+
   revealAlpha = 0;
   revealScale = 0;
+
+  state = "approach";
 }
 
 document.addEventListener("keydown", function(e) {
@@ -144,7 +147,6 @@ function getHorizontalSlice() {
 
       const t = (sensorY - ay) / (by - ay);
       const x = a.x + (b.x - a.x) * t;
-
       hits.push(x);
     }
   }
@@ -169,9 +171,9 @@ function drawMist() {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  for (let i = 0; i < 60; i++) {
-    const size = 30 + Math.random() * 100;
-    const alpha = Math.random() * 0.025;
+  for (let i = 0; i < 45; i++) {
+    const size = 50 + Math.random() * 120;
+    const alpha = Math.random() * 0.018;
 
     ctx.fillStyle = `rgba(255,255,255,${alpha})`;
     ctx.beginPath();
@@ -193,24 +195,24 @@ function drawSlice(slice) {
   const x2 = cx() + slice.right;
   const y = cy();
 
-  const progress = Math.min(1, Math.max(0, (shapeY + 230) / 420));
-  const alpha = 0.10 + progress * 0.65;
+  const darkness = approachProgress * fadeAlpha;
+  const alpha = 0.08 + darkness * 0.80;
 
   const grad = ctx.createLinearGradient(x1, 0, x2, 0);
 
   grad.addColorStop(0.00, `rgba(0,0,0,0)`);
-  grad.addColorStop(0.18, `rgba(0,0,0,${alpha * 0.35})`);
-  grad.addColorStop(0.38, `rgba(0,0,0,${alpha * 0.75})`);
+  grad.addColorStop(0.16, `rgba(0,0,0,${alpha * 0.25})`);
+  grad.addColorStop(0.34, `rgba(0,0,0,${alpha * 0.65})`);
   grad.addColorStop(0.50, `rgba(0,0,0,${alpha})`);
-  grad.addColorStop(0.62, `rgba(0,0,0,${alpha * 0.75})`);
-  grad.addColorStop(0.82, `rgba(0,0,0,${alpha * 0.35})`);
+  grad.addColorStop(0.66, `rgba(0,0,0,${alpha * 0.65})`);
+  grad.addColorStop(0.84, `rgba(0,0,0,${alpha * 0.25})`);
   grad.addColorStop(1.00, `rgba(0,0,0,0)`);
 
-  ctx.shadowBlur = 22;
-  ctx.shadowColor = `rgba(0,0,0,${alpha * 0.25})`;
+  ctx.shadowBlur = 30 * darkness;
+  ctx.shadowColor = `rgba(0,0,0,${0.35 * darkness})`;
 
   ctx.strokeStyle = grad;
-  ctx.lineWidth = 16;
+  ctx.lineWidth = 12 + 10 * approachProgress;
 
   ctx.beginPath();
   ctx.moveTo(x1, y);
@@ -221,10 +223,10 @@ function drawSlice(slice) {
 }
 
 function drawReveal() {
-  if (!revealing && revealAlpha <= 0) return;
+  if (state !== "reveal") return;
 
-  revealAlpha += (1 - revealAlpha) * 0.04;
-  revealScale += (1 - revealScale) * 0.05;
+  revealAlpha += (1 - revealAlpha) * 0.05;
+  revealScale += (1 - revealScale) * 0.06;
 
   const x = canvas.width - 180;
   const y = canvas.height - 170;
@@ -238,10 +240,8 @@ function drawReveal() {
   ctx.lineWidth = 3;
 
   ctx.beginPath();
-
   for (let i = 0; i < lastPolygon.length; i++) {
     const p = lastPolygon[i];
-
     if (i === 0) ctx.moveTo(p.x * scale, p.y * scale);
     else ctx.lineTo(p.x * scale, p.y * scale);
   }
@@ -249,7 +249,6 @@ function drawReveal() {
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
-
   ctx.restore();
 
   ctx.fillStyle = `rgba(0,0,0,${0.65 * revealAlpha})`;
@@ -261,22 +260,47 @@ function drawReveal() {
 function draw() {
   drawMist();
 
-  ctx.strokeStyle = "rgba(0,0,0,0.14)";
+  ctx.strokeStyle = "rgba(0,0,0,0.12)";
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(0, cy());
   ctx.lineTo(canvas.width, cy());
   ctx.stroke();
 
-  if (active) {
+  if (state === "approach") {
+    approachProgress += speed;
+
+    if (approachProgress >= 1) {
+      approachProgress = 1;
+      state = "hold";
+      holdTimer = HOLD_FRAMES;
+    }
+
+    shapeY = -230 + approachProgress * 230;
+
+    const slice = getHorizontalSlice();
+    drawSlice(slice);
+  }
+
+  else if (state === "hold") {
     const slice = getHorizontalSlice();
     drawSlice(slice);
 
-    shapeY += speed;
+    holdTimer--;
 
-    if (shapeY > 230) {
-      active = false;
-      revealing = true;
+    if (holdTimer <= 0) {
+      state = "fade";
+    }
+  }
+
+  else if (state === "fade") {
+    fadeAlpha *= 0.94;
+
+    const slice = getHorizontalSlice();
+    drawSlice(slice);
+
+    if (fadeAlpha < 0.03) {
+      state = "reveal";
     }
   }
 
